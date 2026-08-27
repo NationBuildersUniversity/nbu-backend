@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// POST /api/attendance — Faculty/Staff only. Records who marked it and when.
 router.post("/", requireRole("faculty", "staff"), async (req, res) => {
   const { student_id, course_id, date, status } = req.body || {};
   if (!student_id || !course_id || !date || !["present", "absent"].includes(status)) {
@@ -21,6 +22,7 @@ router.post("/", requireRole("faculty", "staff"), async (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /api/attendance/student/:studentId
 router.get("/student/:studentId", async (req, res) => {
   const targetId = Number(req.params.studentId);
   if (req.user.role === "student") {

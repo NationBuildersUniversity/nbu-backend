@@ -8,6 +8,8 @@ router.use(requireAuth);
 
 const VALID_ROLES = ["student", "faculty", "mentor", "staff", "boardDirector", "boardAdvisor"];
 
+// POST /api/users — Staff only. This is the ONLY way to create Faculty, Mentor,
+// Staff, or Board accounts — there is no public registration for those roles.
 router.post("/", requireRole("staff"), async (req, res) => {
   const { email, password, full_name, role } = req.body || {};
   if (!email || !password || !full_name || !role) {
@@ -28,9 +30,25 @@ router.post("/", requireRole("staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id, email, role, full_name });
 });
 
+// GET /api/users — Staff and Board only: directory listing.
 router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (req, res) => {
   const { rows } = await pool.query("SELECT id, email, role, full_name, created_at FROM users");
   res.json({ users: rows });
+});
+
+// POST /api/users/:id/reset-password — Staff only. Real substitute for self-service
+// email-based reset, since we have no email provider wired up (see README "Payments"-
+// style note: this needs a real provider before self-service reset can exist).
+router.post("/:id/reset-password", requireRole("staff"), async (req, res) => {
+  const { new_password } = req.body || {};
+  if (!new_password || new_password.length < 10) {
+    return res.status(400).json({ error: "new_password is required and must be at least 10 characters." });
+  }
+  const hash = bcrypt.hashSync(new_password, 10);
+  const { rowCount } = await pool.query("UPDATE users SET password_hash = $1 WHERE id = $2", [hash, req.params.id]);
+  if (rowCount === 0) return res.status(404).json({ error: "User not found." });
+  await logAction(req.user.id, "reset_password", "user", req.params.id, null);
+  res.json({ ok: true });
 });
 
 module.exports = router;

@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// ---- Course content (PDF/Video/Audio) ----
 router.get("/content", async (req, res) => {
   const { school_code } = req.query;
   const { rows } = school_code
@@ -13,16 +14,17 @@ router.get("/content", async (req, res) => {
   res.json({ content: rows });
 });
 router.post("/content", requireRole("faculty", "staff"), async (req, res) => {
-  const { school_code, title, type, file_name } = req.body || {};
+  const { school_code, title, type, file_name, external_url } = req.body || {};
   if (!school_code || !title || !type) return res.status(400).json({ error: "school_code, title, and type are required." });
   const { rows } = await pool.query(
     "INSERT INTO course_content (school_code, title, type, file_name, uploaded_by) VALUES ($1,$2,$3,$4,$5) RETURNING id",
-    [school_code, title, type, file_name || null, req.user.id]
+    [school_code, title, type, external_url || file_name || null, req.user.id]
   );
   await logAction(req.user.id, "upload", "course_content", rows[0].id, req.body);
   res.status(201).json({ id: rows[0].id });
 });
 
+// ---- Quizzes (question bank per school, feeds Exams below) ----
 router.get("/quizzes", async (req, res) => {
   const { school_code } = req.query;
   const { rows } = school_code
@@ -43,6 +45,7 @@ router.post("/quizzes", requireRole("faculty", "staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
+// ---- Exams (scheduled, draw questions from the quiz bank for their school) ----
 router.get("/exams", async (req, res) => {
   const { school_code } = req.query;
   const { rows } = school_code
@@ -61,9 +64,10 @@ router.post("/exams", requireRole("faculty", "staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
+// Student submits real answers; server grades against the real quiz bank — no client-side trust.
 router.post("/exams/:id/submit", async (req, res) => {
   const examId = Number(req.params.id);
-  const { student_id, answers } = req.body || {};
+  const { student_id, answers } = req.body || {}; // answers: { [quizId]: chosenIndex }
   if (!student_id || !answers) return res.status(400).json({ error: "student_id and answers are required." });
 
   const { rows: examRows } = await pool.query("SELECT * FROM exams WHERE id = $1", [examId]);

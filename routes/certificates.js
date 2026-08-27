@@ -5,6 +5,7 @@ const { requireAuth } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// Reference catalog — readable by anyone logged in.
 router.get("/", async (req, res) => {
   const { category } = req.query;
   const { rows } = category

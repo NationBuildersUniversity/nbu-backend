@@ -5,6 +5,8 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// GET /api/stats — Staff/Board only. Real aggregate numbers computed from the
+// database, not sample/hardcoded data.
 router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (req, res) => {
   const [{ rows: studentCount }, { rows: feeAgg }, { rows: pendingLeave }, { rows: byRole }] = await Promise.all([
     pool.query("SELECT COUNT(*)::int AS c FROM students"),

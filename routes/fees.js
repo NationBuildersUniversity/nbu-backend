@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// GET /api/fees/student/:studentId — balance + real transaction history.
 router.get("/student/:studentId", async (req, res) => {
   const targetId = Number(req.params.studentId);
   if (req.user.role === "student") {
@@ -23,6 +24,9 @@ router.get("/student/:studentId", async (req, res) => {
   res.json({ balance: student.fee_total - student.fee_paid, ...student, transactions });
 });
 
+// POST /api/fees/transactions — Staff only. Records a payment that was ALREADY
+// received through some real-world channel (bank transfer, check, in-person).
+// This is real bookkeeping — it does not move any money itself.
 router.post("/transactions", requireRole("staff"), async (req, res) => {
   const { student_id, amount, method, note } = req.body || {};
   if (!student_id || !amount) return res.status(400).json({ error: "student_id and amount are required." });
@@ -46,6 +50,10 @@ router.post("/transactions", requireRole("staff"), async (req, res) => {
   res.status(201).json({ ok: true });
 });
 
+// POST /api/fees/checkout — deliberately NOT implemented.
+// Real online card/ACH payment requires a verified payment processor account
+// (Stripe, etc.) that only NBU can create. Wiring this up is a real, separate
+// task once those credentials exist — see README.md "Payments" section.
 router.post("/checkout", (req, res) => {
   res.status(501).json({
     error:

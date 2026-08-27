@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// GET /api/students — Staff/Faculty/Mentor/Board can list; a student can only see themselves.
 router.get("/", async (req, res) => {
   if (req.user.role === "student") {
     const { rows } = await pool.query(
@@ -26,12 +27,14 @@ router.get("/", async (req, res) => {
     return res.json({ students: rows });
   }
 
+  // staff, faculty, boardDirector, boardAdvisor: full roster.
   const { rows } = await pool.query(
     `SELECT s.*, u.full_name, u.email FROM students s JOIN users u ON u.id = s.user_id`
   );
   res.json({ students: rows });
 });
 
+// POST /api/students — Staff only: create a student record (enrollment).
 router.post("/", requireRole("staff"), async (req, res) => {
   const { user_id, student_number, school_code, program, level, term, fee_total } = req.body || {};
   if (!user_id || !student_number || !school_code || !program || !level || !term) {
@@ -50,6 +53,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   }
 });
 
+// PATCH /api/students/:id — Staff only: update program/level/term/credits.
 router.patch("/:id", requireRole("staff"), async (req, res) => {
   const fields = ["school_code", "program", "level", "term", "credits_completed", "credits_required", "fee_total"];
   const updates = [];

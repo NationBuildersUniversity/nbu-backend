@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// Any logged-in user can raise a ticket; only they (or staff) see it listed appropriately.
 router.get("/", async (req, res) => {
   if (req.user.role === "staff" || req.user.role === "boardDirector" || req.user.role === "boardAdvisor") {
     const { rows } = await pool.query(

@@ -5,6 +5,7 @@ const { requireAuth } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// GET /api/internships — scoped by role, enforced server-side.
 router.get("/", async (req, res) => {
   if (req.user.role === "student") {
     const { rows: own } = await pool.query("SELECT id FROM students WHERE user_id = $1", [req.user.id]);
@@ -28,6 +29,7 @@ router.get("/", async (req, res) => {
   res.json({ internships: rows });
 });
 
+// PATCH /api/internships/:studentId — Staff or the assigned Mentor only.
 router.patch("/:studentId", async (req, res) => {
   const studentId = Number(req.params.studentId);
 

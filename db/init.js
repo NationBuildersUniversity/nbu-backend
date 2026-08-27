@@ -12,6 +12,11 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
 });
 
+// ---------------------------------------------------------------------------
+// Schema. Real tables, real constraints, real persistence — this lives in
+// Postgres, not on any local disk, so it survives restarts/redeploys and
+// works on hosts (like Render's free tier) that don't offer persistent disks.
+// ---------------------------------------------------------------------------
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -219,6 +224,75 @@ CREATE TABLE IF NOT EXISTS exam_submissions (
   submitted_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(exam_id, student_id)
 );
+
+CREATE TABLE IF NOT EXISTS enrollments (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+  course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+  term TEXT NOT NULL,
+  enrolled_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(student_id, course_id, term)
+);
+
+CREATE TABLE IF NOT EXISTS assignments (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  due_at TIMESTAMPTZ,
+  max_points NUMERIC NOT NULL DEFAULT 100,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+  id SERIAL PRIMARY KEY,
+  assignment_id INTEGER REFERENCES assignments(id) ON DELETE CASCADE,
+  student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+  content TEXT,
+  file_url TEXT,
+  submitted_at TIMESTAMPTZ DEFAULT now(),
+  is_late BOOLEAN DEFAULT false,
+  grade NUMERIC,
+  feedback TEXT,
+  graded_at TIMESTAMPTZ,
+  graded_by INTEGER REFERENCES users(id),
+  UNIQUE(assignment_id, student_id)
+);
+
+CREATE TABLE IF NOT EXISTS discussion_threads (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS discussion_posts (
+  id SERIAL PRIMARY KEY,
+  thread_id INTEGER REFERENCES discussion_threads(id) ON DELETE CASCADE,
+  author_id INTEGER REFERENCES users(id),
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS live_sessions (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  meeting_url TEXT,
+  scheduled_at TIMESTAMPTZ NOT NULL,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 `;
 
 const CERTIFICATE_CATALOG_SEED = {
@@ -234,6 +308,7 @@ async function seedIfEmpty() {
   if (rows[0].c > 0) return;
 
   const hash = (pw) => bcrypt.hashSync(pw, 10);
+  // NOTE: placeholder passwords for first-run setup only — change immediately. See README.
   await pool.query(
     "INSERT INTO users (email, password_hash, role, full_name) VALUES ($1,$2,$3,$4)",
     ["registrar@nationbuilderuniversity.com", hash("ChangeMe!123"), "staff", "Registrar Office"]
@@ -262,6 +337,10 @@ async function logAction(actorId, action, entity, entityId, detail) {
   );
 }
 
+async function notify(userId, message) {
+  await pool.query("INSERT INTO notifications (user_id, message) VALUES ($1,$2)", [userId, message]);
+}
+
 async function seedCertificateCatalog() {
   const { rows } = await pool.query("SELECT COUNT(*)::int AS c FROM certificates_catalog");
   if (rows[0].c > 0) return;
@@ -273,4 +352,4 @@ async function seedCertificateCatalog() {
   console.log("Seeded certificate catalog (77 certificates).");
 }
 
-module.exports = { pool, init, logAction };
+module.exports = { pool, init, logAction, notify };

@@ -5,6 +5,7 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// POST /api/mentors — Staff only: register a user (already created with role='mentor') as a mentor record.
 router.post("/", requireRole("staff"), async (req, res) => {
   const { user_id, school_code } = req.body || {};
   if (!user_id || !school_code) return res.status(400).json({ error: "user_id and school_code are required." });
@@ -16,6 +17,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
+// GET /api/mentors — Staff/Board: list mentors with their assigned mentees.
 router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (req, res) => {
   const { rows: mentors } = await pool.query(
     `SELECT m.id, m.school_code, u.full_name, u.email FROM mentors m JOIN users u ON u.id = m.user_id`
@@ -33,6 +35,7 @@ router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (re
   res.json({ mentors });
 });
 
+// POST /api/mentors/:mentorId/students/:studentId — Staff only: assign a mentee.
 router.post("/:mentorId/students/:studentId", requireRole("staff"), async (req, res) => {
   await pool.query(
     "INSERT INTO mentor_students (mentor_id, student_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
