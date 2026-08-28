@@ -60,7 +60,8 @@ CREATE TABLE IF NOT EXISTS courses (
   school_code TEXT NOT NULL,
   department TEXT,
   level TEXT,
-  credits INTEGER DEFAULT 3
+  credits INTEGER DEFAULT 3,
+  teacher_id INTEGER REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS attendance (
@@ -293,6 +294,19 @@ CREATE TABLE IF NOT EXISTS notifications (
   is_read BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS schools (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  credentials TEXT
+);
+
+CREATE TABLE IF NOT EXISTS departments (
+  id SERIAL PRIMARY KEY,
+  school_code TEXT REFERENCES schools(code),
+  name TEXT NOT NULL,
+  UNIQUE(school_code, name)
+);
 `;
 
 const CERTIFICATE_CATALOG_SEED = {
@@ -328,6 +342,7 @@ async function init() {
   await pool.query(SCHEMA);
   await seedIfEmpty();
   await seedCertificateCatalog();
+  await seedSchoolsAndDepartments();
 }
 
 async function logAction(actorId, action, entity, entityId, detail) {
@@ -352,4 +367,32 @@ async function seedCertificateCatalog() {
   console.log("Seeded certificate catalog (77 certificates).");
 }
 
+// Real School/Department structure from the 2026–2027 catalog (Appendix A).
+const SCHOOLS_SEED = [
+  { code: "01", name: "School of Business, Executive Strategy & Consulting", credentials: "Diploma, BBA & MBA",
+    departments: ["Business Administration", "Entrepreneurship & Innovation", "Finance & Accounting", "Marketing & Human Capital Management"] },
+  { code: "02", name: "School of Public Policy, Diplomacy & Humanitarian Studies", credentials: "Diploma, BPA/BA & MPA/MA",
+    departments: ["Public Administration & Policy", "International Relations & Diplomacy", "Humanitarian, Peace & Security Studies"] },
+  { code: "03", name: "School of Advanced Technology & Applied Analytics", credentials: "Diploma, BS & MS",
+    departments: ["Artificial Intelligence", "Computer Science & Information Technology", "Cybersecurity", "Data Science & Analytics"] },
+  { code: "04", name: "School of Service Operations & Global Hospitality", credentials: "Diploma, BS & MS",
+    departments: ["Hospitality Management", "Tourism, Aviation & Logistics Management", "Event, Sports & Entertainment Management"] },
+  { code: "05", name: "School of Humanities, Communication & Educational Innovation", credentials: "Diploma, BA & MA/M.Ed.",
+    departments: ["Communication & Digital Media", "Education & Learning Technologies", "Professional Studies"] },
+];
+
+async function seedSchoolsAndDepartments() {
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS c FROM schools");
+  if (rows[0].c > 0) return;
+  for (const s of SCHOOLS_SEED) {
+    await pool.query("INSERT INTO schools (code, name, credentials) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [s.code, s.name, s.credentials]);
+    for (const d of s.departments) {
+      await pool.query("INSERT INTO departments (school_code, name) VALUES ($1,$2) ON CONFLICT DO NOTHING", [s.code, d]);
+    }
+  }
+  console.log("Seeded 5 schools and 17 departments.");
+}
+
 module.exports = { pool, init, logAction, notify };
+
+
