@@ -35,6 +35,7 @@ app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/analytics", require("./routes/analytics"));
 app.use("/api/audit-log", require("./routes/auditlog"));
 app.use("/api/export", require("./routes/export"));
+app.use("/api/catalog", require("./routes/catalog"));
 
 // Generic error handler — never leak stack traces to clients.
 app.use((err, req, res, next) => {
