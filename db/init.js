@@ -12,11 +12,6 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL.includes("localhost") ? false : { rejectUnauthorized: false },
 });
 
-// ---------------------------------------------------------------------------
-// Schema. Real tables, real constraints, real persistence — this lives in
-// Postgres, not on any local disk, so it survives restarts/redeploys and
-// works on hosts (like Render's free tier) that don't offer persistent disks.
-// ---------------------------------------------------------------------------
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
@@ -322,7 +317,6 @@ async function seedIfEmpty() {
   if (rows[0].c > 0) return;
 
   const hash = (pw) => bcrypt.hashSync(pw, 10);
-  // NOTE: placeholder passwords for first-run setup only — change immediately. See README.
   await pool.query(
     "INSERT INTO users (email, password_hash, role, full_name) VALUES ($1,$2,$3,$4)",
     ["registrar@nationbuilderuniversity.com", hash("ChangeMe!123"), "staff", "Registrar Office"]
@@ -340,6 +334,7 @@ async function seedIfEmpty() {
 
 async function init() {
   await pool.query(SCHEMA);
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS teacher_id INTEGER REFERENCES users(id)");
   await seedIfEmpty();
   await seedCertificateCatalog();
   await seedSchoolsAndDepartments();
@@ -367,7 +362,6 @@ async function seedCertificateCatalog() {
   console.log("Seeded certificate catalog (77 certificates).");
 }
 
-// Real School/Department structure from the 2026–2027 catalog (Appendix A).
 const SCHOOLS_SEED = [
   { code: "01", name: "School of Business, Executive Strategy & Consulting", credentials: "Diploma, BBA & MBA",
     departments: ["Business Administration", "Entrepreneurship & Innovation", "Finance & Accounting", "Marketing & Human Capital Management"] },
@@ -394,5 +388,3 @@ async function seedSchoolsAndDepartments() {
 }
 
 module.exports = { pool, init, logAction, notify };
-
-
