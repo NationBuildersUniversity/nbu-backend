@@ -6,15 +6,19 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get("/", async (req, res) => {
-  const { school_code } = req.query;
-  const base = `SELECT c.*, u.full_name AS teacher_name, s.name AS school_name
-                FROM courses c
-                LEFT JOIN users u ON u.id = c.teacher_id
-                LEFT JOIN schools s ON s.code = c.school_code`;
-  const { rows } = school_code
-    ? await pool.query(`${base} WHERE c.school_code = $1 ORDER BY c.code`, [school_code])
-    : await pool.query(`${base} ORDER BY c.code`);
-  res.json({ courses: rows });
+  try {
+    const { school_code } = req.query;
+    const base = `SELECT c.*, u.full_name AS teacher_name, s.name AS school_name
+                  FROM courses c
+                  LEFT JOIN users u ON u.id = c.teacher_id
+                  LEFT JOIN schools s ON s.code = c.school_code`;
+    const { rows } = school_code
+      ? await pool.query(`${base} WHERE c.school_code = $1 ORDER BY c.code`, [school_code])
+      : await pool.query(`${base} ORDER BY c.code`);
+    res.json({ courses: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 router.post("/", requireRole("faculty", "staff"), async (req, res) => {
@@ -33,10 +37,14 @@ router.post("/", requireRole("faculty", "staff"), async (req, res) => {
 });
 
 router.patch("/:id/teacher", requireRole("staff"), async (req, res) => {
-  const { teacher_id } = req.body || {};
-  await pool.query("UPDATE courses SET teacher_id = $1 WHERE id = $2", [teacher_id || null, req.params.id]);
-  await logAction(req.user.id, "assign_teacher", "course", req.params.id, { teacher_id });
-  res.json({ ok: true });
+  try {
+    const { teacher_id } = req.body || {};
+    await pool.query("UPDATE courses SET teacher_id = $1 WHERE id = $2", [teacher_id || null, req.params.id]);
+    await logAction(req.user.id, "assign_teacher", "course", req.params.id, { teacher_id });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;
