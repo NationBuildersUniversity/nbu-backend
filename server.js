@@ -37,10 +37,13 @@ app.use("/api/audit-log", require("./routes/auditlog"));
 app.use("/api/export", require("./routes/export"));
 app.use("/api/catalog", require("./routes/catalog"));
 
-// Generic error handler — never leak stack traces to clients.
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Internal server error." });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection (server stayed up):", reason);
 });
 
 const PORT = process.env.PORT || 4000;
