@@ -36,6 +36,10 @@ app.use("/api/analytics", require("./routes/analytics"));
 app.use("/api/audit-log", require("./routes/auditlog"));
 app.use("/api/export", require("./routes/export"));
 app.use("/api/catalog", require("./routes/catalog"));
+app.use("/api/careers", require("./routes/careers"));
+app.use("/api/profile", require("./routes/profile"));
+app.use("/api/tasks", require("./routes/tasks"));
+app.use("/api/onboarding", require("./routes/onboarding"));
 
 app.use((err, req, res, next) => {
   console.error(err);
