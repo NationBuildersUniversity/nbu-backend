@@ -6,10 +6,8 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
-const VALID_ROLES = ["student", "faculty", "mentor", "staff", "boardDirector", "boardAdvisor"];
+const VALID_ROLES = ["student", "faculty", "mentor", "staff", "boardDirector", "boardAdvisor", "hr", "accounting", "marketing"];
 
-// POST /api/users — Staff only. This is the ONLY way to create Faculty, Mentor,
-// Staff, or Board accounts — there is no public registration for those roles.
 router.post("/", requireRole("staff"), async (req, res) => {
   const { email, password, full_name, role } = req.body || {};
   if (!email || !password || !full_name || !role) {
@@ -30,15 +28,11 @@ router.post("/", requireRole("staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id, email, role, full_name });
 });
 
-// GET /api/users — Staff and Board only: directory listing.
 router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (req, res) => {
   const { rows } = await pool.query("SELECT id, email, role, full_name, created_at FROM users");
   res.json({ users: rows });
 });
 
-// POST /api/users/:id/reset-password — Staff only. Real substitute for self-service
-// email-based reset, since we have no email provider wired up (see README "Payments"-
-// style note: this needs a real provider before self-service reset can exist).
 router.post("/:id/reset-password", requireRole("staff"), async (req, res) => {
   const { new_password } = req.body || {};
   if (!new_password || new_password.length < 10) {
