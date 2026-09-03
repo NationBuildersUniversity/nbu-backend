@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('student','faculty','mentor','staff','boardDirector','boardAdvisor')),
+  role TEXT NOT NULL CHECK (role IN ('student','faculty','mentor','staff','boardDirector','boardAdvisor','hr','accounting','marketing')),
   full_name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -361,6 +361,30 @@ CREATE TABLE IF NOT EXISTS onboarding_tasks (
   label TEXT NOT NULL,
   is_complete BOOLEAN DEFAULT false
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ledger_entries (
+  id SERIAL PRIMARY KEY,
+  entry_type TEXT NOT NULL CHECK (entry_type IN ('Income','Expense')),
+  category TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  description TEXT,
+  entry_date DATE NOT NULL,
+  recorded_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS id_card_templates (
+  role TEXT PRIMARY KEY,
+  front_image_url TEXT,
+  back_image_url TEXT,
+  updated_by INTEGER REFERENCES users(id),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 `;
 
 const CERTIFICATE_CATALOG_SEED = {
@@ -399,6 +423,15 @@ async function init() {
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS linkedin_url TEXT");
   await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT");
   await pool.query("ALTER TABLE internships ADD COLUMN IF NOT EXISTS mentor_notes TEXT");
+  await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS verification_code TEXT UNIQUE");
+  await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS graduated_at DATE");
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+      ALTER TABLE users ADD CONSTRAINT users_role_check
+        CHECK (role IN ('student','faculty','mentor','staff','boardDirector','boardAdvisor','hr','accounting','marketing'));
+    END $$;
+  `);
   await seedIfEmpty();
   await seedCertificateCatalog();
   await seedSchoolsAndDepartments();
@@ -452,3 +485,4 @@ async function seedSchoolsAndDepartments() {
 }
 
 module.exports = { pool, init, logAction, notify };
+ 
