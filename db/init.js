@@ -426,8 +426,16 @@ async function init() {
   await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS verification_code TEXT UNIQUE");
   await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS graduated_at DATE");
   await pool.query(`
-    DO $$ BEGIN
-      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+    DO $$
+    DECLARE
+      con_name text;
+    BEGIN
+      SELECT conname INTO con_name
+      FROM pg_constraint
+      WHERE conrelid = 'users'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%role%';
+      IF con_name IS NOT NULL THEN
+        EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', con_name);
+      END IF;
       ALTER TABLE users ADD CONSTRAINT users_role_check
         CHECK (role IN ('student','faculty','mentor','staff','boardDirector','boardAdvisor','hr','accounting','marketing'));
     END $$;
