@@ -1,11 +1,15 @@
 const express = require("express");
+const crypto = require("crypto");
 const { pool, logAction } = require("../db/init");
 const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 router.use(requireAuth);
 
-// GET /api/students — Staff/Faculty/Mentor/Board can list; a student can only see themselves.
+function generateVerificationCode() {
+  return "NBU-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
 router.get("/", async (req, res) => {
   if (req.user.role === "student") {
     const { rows } = await pool.query(
@@ -27,14 +31,12 @@ router.get("/", async (req, res) => {
     return res.json({ students: rows });
   }
 
-  // staff, faculty, boardDirector, boardAdvisor: full roster.
   const { rows } = await pool.query(
     `SELECT s.*, u.full_name, u.email FROM students s JOIN users u ON u.id = s.user_id`
   );
   res.json({ students: rows });
 });
 
-// POST /api/students — Staff only: create a student record (enrollment).
 router.post("/", requireRole("staff"), async (req, res) => {
   const { user_id, student_number, school_code, program, level, term, fee_total } = req.body || {};
   if (!user_id || !student_number || !school_code || !program || !level || !term) {
@@ -42,20 +44,19 @@ router.post("/", requireRole("staff"), async (req, res) => {
   }
   try {
     const { rows } = await pool.query(
-      `INSERT INTO students (user_id, student_number, school_code, program, level, term, fee_total)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-      [user_id, student_number, school_code, program, level, term, fee_total || 0]
+      `INSERT INTO students (user_id, student_number, school_code, program, level, term, fee_total, verification_code)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, verification_code`,
+      [user_id, student_number, school_code, program, level, term, fee_total || 0, generateVerificationCode()]
     );
     await logAction(req.user.id, "create", "student", rows[0].id, req.body);
-    res.status(201).json({ id: rows[0].id });
+    res.status(201).json({ id: rows[0].id, verification_code: rows[0].verification_code });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
-// PATCH /api/students/:id — Staff only: update program/level/term/credits.
 router.patch("/:id", requireRole("staff"), async (req, res) => {
-  const fields = ["school_code", "program", "level", "term", "credits_completed", "credits_required", "fee_total"];
+  const fields = ["school_code", "program", "level", "term", "credits_completed", "credits_required", "fee_total", "graduated_at"];
   const updates = [];
   const values = [];
   let i = 1;
