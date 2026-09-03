@@ -30,6 +30,8 @@ router.get("/", async (req, res) => {
 });
 
 // PATCH /api/internships/:studentId — Staff or the assigned Mentor only.
+// Real upsert: a student has no internship row until someone places them, so this
+// creates the record on first use instead of silently updating nothing.
 router.patch("/:studentId", async (req, res) => {
   const studentId = Number(req.params.studentId);
 
@@ -44,21 +46,35 @@ router.patch("/:studentId", async (req, res) => {
     return res.status(403).json({ error: "Only Staff or the assigned Mentor may update internship records." });
   }
 
-  const fields = ["organization", "period", "industry_supervisor", "status", "hours_logged", "hours_required"];
-  const updates = [];
-  const values = [];
-  let i = 1;
-  for (const f of fields) {
-    if (req.body[f] !== undefined) {
-      updates.push(`${f} = $${i++}`);
-      values.push(req.body[f]);
+  const { organization, period, industry_supervisor, status, hours_logged, hours_required, mentor_notes } = req.body || {};
+  try {
+    const { rows: existing } = await pool.query("SELECT id FROM internships WHERE student_id = $1", [studentId]);
+    if (existing.length === 0) {
+      await pool.query(
+        `INSERT INTO internships (student_id, organization, period, industry_supervisor, status, hours_logged, hours_required, mentor_notes, academic_supervisor_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          studentId, organization || null, period || null, industry_supervisor || null,
+          status || "Not Started", hours_logged ?? 0, hours_required ?? 300, mentor_notes || null,
+          req.user.role === "mentor" ? req.user.id : null,
+        ]
+      );
+    } else {
+      const fields = { organization, period, industry_supervisor, status, hours_logged, hours_required, mentor_notes };
+      const updates = []; const values = []; let i = 1;
+      for (const [key, val] of Object.entries(fields)) {
+        if (val !== undefined) { updates.push(`${key} = $${i++}`); values.push(val); }
+      }
+      if (updates.length > 0) {
+        values.push(studentId);
+        await pool.query(`UPDATE internships SET ${updates.join(", ")} WHERE student_id = $${i}`, values);
+      }
     }
+    await logAction(req.user.id, "update_internship", "internship", studentId, req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  if (updates.length === 0) return res.status(400).json({ error: "No valid fields to update." });
-  values.push(studentId);
-  await pool.query(`UPDATE internships SET ${updates.join(", ")} WHERE student_id = $${i}`, values);
-  await logAction(req.user.id, "update_internship", "internship", studentId, req.body);
-  res.json({ ok: true });
 });
 
 module.exports = router;
