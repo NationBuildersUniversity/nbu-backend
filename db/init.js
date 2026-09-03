@@ -302,6 +302,65 @@ CREATE TABLE IF NOT EXISTS departments (
   name TEXT NOT NULL,
   UNIQUE(school_code, name)
 );
+
+CREATE TABLE IF NOT EXISTS job_postings (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  role_type TEXT NOT NULL CHECK (role_type IN ('Lecturer','Dean','Head of Department','Administrative','Staff','Other')),
+  school_code TEXT REFERENCES schools(code),
+  department TEXT,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'Open' CHECK (status IN ('Open','Closed')),
+  posted_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS job_applications (
+  id SERIAL PRIMARY KEY,
+  job_id INTEGER REFERENCES job_postings(id) ON DELETE CASCADE,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'Applied' CHECK (status IN ('Applied','Reviewing','Interview','Offer','Rejected')),
+  applied_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(job_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+  id SERIAL PRIMARY KEY,
+  project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  assignee_id INTEGER REFERENCES users(id),
+  status TEXT NOT NULL DEFAULT 'To Do' CHECK (status IN ('To Do','In Progress','Done')),
+  due_date DATE,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS onboarding (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  contract_type TEXT,
+  start_date DATE,
+  status TEXT NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending','In Progress','Complete')),
+  notes TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS onboarding_tasks (
+  id SERIAL PRIMARY KEY,
+  onboarding_id INTEGER REFERENCES onboarding(id) ON DELETE CASCADE,
+  label TEXT NOT NULL,
+  is_complete BOOLEAN DEFAULT false
+);
 `;
 
 const CERTIFICATE_CATALOG_SEED = {
@@ -335,6 +394,11 @@ async function seedIfEmpty() {
 async function init() {
   await pool.query(SCHEMA);
   await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS teacher_id INTEGER REFERENCES users(id)");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_url TEXT");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS linkedin_url TEXT");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT");
+  await pool.query("ALTER TABLE internships ADD COLUMN IF NOT EXISTS mentor_notes TEXT");
   await seedIfEmpty();
   await seedCertificateCatalog();
   await seedSchoolsAndDepartments();
