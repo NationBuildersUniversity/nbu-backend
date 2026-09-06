@@ -385,6 +385,49 @@ CREATE TABLE IF NOT EXISTS id_card_templates (
   updated_by INTEGER REFERENCES users(id),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS academic_calendar (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  event_type TEXT NOT NULL CHECK (event_type IN ('Term Start','Term End','Holiday','Break','Exam Period','Registration')),
+  start_date DATE NOT NULL,
+  end_date DATE,
+  school_code TEXT REFERENCES schools(code),
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS course_schedule (
+  id SERIAL PRIMARY KEY,
+  course_id INTEGER REFERENCES courses(id) ON DELETE CASCADE,
+  day_of_week TEXT NOT NULL CHECK (day_of_week IN ('Mon','Tue','Wed','Thu','Fri','Sat','Sun')),
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  room TEXT,
+  term TEXT NOT NULL,
+  created_by INTEGER REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS certificate_sections (
+  id SERIAL PRIMARY KEY,
+  certificate_id INTEGER REFERENCES certificates_catalog(id) ON DELETE CASCADE,
+  section_name TEXT NOT NULL,
+  duration_months INTEGER NOT NULL CHECK (duration_months BETWEEN 1 AND 3),
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  capacity INTEGER,
+  syllabus_url TEXT,
+  created_by INTEGER REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS certificate_enrollments (
+  id SERIAL PRIMARY KEY,
+  section_id INTEGER REFERENCES certificate_sections(id) ON DELETE CASCADE,
+  student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+  enrolled_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(section_id, student_id)
+);
 `;
 
 const CERTIFICATE_CATALOG_SEED = {
@@ -425,6 +468,10 @@ async function init() {
   await pool.query("ALTER TABLE internships ADD COLUMN IF NOT EXISTS mentor_notes TEXT");
   await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS verification_code TEXT UNIQUE");
   await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS graduated_at DATE");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS prerequisite_course_id INTEGER REFERENCES courses(id)");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS is_elective BOOLEAN DEFAULT false");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS applicable_levels TEXT[] DEFAULT '{}'");
+  await pool.query("ALTER TABLE courses ADD COLUMN IF NOT EXISTS syllabus_url TEXT");
   await pool.query(`
     DO $$
     DECLARE
