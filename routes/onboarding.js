@@ -13,7 +13,7 @@ const DEFAULT_CHECKLIST = [
   "Orientation completed",
 ];
 
-router.get("/", requireRole("staff"), async (req, res) => {
+router.get("/", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { rows: onboardings } = await pool.query(
       `SELECT o.*, u.full_name, u.email, u.role FROM onboarding o JOIN users u ON u.id = o.user_id ORDER BY o.created_at DESC`
@@ -28,7 +28,7 @@ router.get("/", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.post("/", requireRole("staff"), async (req, res) => {
+router.post("/", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { user_id, contract_type, start_date, notes } = req.body || {};
     if (!user_id) return res.status(400).json({ error: "user_id is required." });
@@ -47,7 +47,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.patch("/tasks/:id", requireRole("staff"), async (req, res) => {
+router.patch("/tasks/:id", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { is_complete } = req.body || {};
     await pool.query("UPDATE onboarding_tasks SET is_complete = $1 WHERE id = $2", [!!is_complete, req.params.id]);
@@ -57,7 +57,7 @@ router.patch("/tasks/:id", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.patch("/:id/status", requireRole("staff"), async (req, res) => {
+router.patch("/:id/status", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { status } = req.body || {};
     if (!["Pending", "In Progress", "Complete"].includes(status)) return res.status(400).json({ error: "Invalid status." });
