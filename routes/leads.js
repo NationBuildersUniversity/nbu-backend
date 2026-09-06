@@ -5,12 +5,12 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const router = express.Router();
 router.use(requireAuth);
 
-router.get("/", requireRole("staff", "boardDirector", "boardAdvisor"), async (req, res) => {
+router.get("/", requireRole("staff", "boardDirector", "boardAdvisor", "marketing"), async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM leads ORDER BY created_at DESC");
   res.json({ leads: rows });
 });
 
-router.post("/", requireRole("staff"), async (req, res) => {
+router.post("/", requireRole("staff", "marketing"), async (req, res) => {
   const { name, interest, stage, tags } = req.body || {};
   if (!name) return res.status(400).json({ error: "name is required." });
   const { rows } = await pool.query(
@@ -21,7 +21,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   res.status(201).json({ id: rows[0].id });
 });
 
-router.patch("/:id", requireRole("staff"), async (req, res) => {
+router.patch("/:id", requireRole("staff", "marketing"), async (req, res) => {
   const fields = ["interest", "stage", "tags"];
   const updates = []; const values = []; let i = 1;
   for (const f of fields) if (req.body[f] !== undefined) { updates.push(`${f} = $${i++}`); values.push(req.body[f]); }
