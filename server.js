@@ -42,6 +42,8 @@ app.use("/api/tasks", require("./routes/tasks"));
 app.use("/api/onboarding", require("./routes/onboarding"));
 app.use("/api/accounting", require("./routes/accounting"));
 app.use("/api/verify", require("./routes/verify"));
+app.use("/api/calendar", require("./routes/calendar"));
+app.use("/api/certificate-sections", require("./routes/certificate-sections"));
 
 app.use((err, req, res, next) => {
   console.error(err);
