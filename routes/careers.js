@@ -4,7 +4,6 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Public — no auth required. This is what the public website's Careers page calls.
 router.get("/public", async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -18,10 +17,9 @@ router.get("/public", async (req, res) => {
   }
 });
 
-// Everything below requires staff login.
 router.use(requireAuth);
 
-router.get("/", requireRole("staff"), async (req, res) => {
+router.get("/", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT jp.*, s.name AS school_name FROM job_postings jp LEFT JOIN schools s ON s.code = jp.school_code ORDER BY jp.created_at DESC`
@@ -32,7 +30,7 @@ router.get("/", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.post("/", requireRole("staff"), async (req, res) => {
+router.post("/", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { title, role_type, school_code, department, description } = req.body || {};
     if (!title || !role_type) return res.status(400).json({ error: "title and role_type are required." });
@@ -47,7 +45,7 @@ router.post("/", requireRole("staff"), async (req, res) => {
   }
 });
 
-router.patch("/:id/status", requireRole("staff"), async (req, res) => {
+router.patch("/:id/status", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { status } = req.body || {};
     if (!["Open", "Closed"].includes(status)) return res.status(400).json({ error: "status must be Open or Closed." });
@@ -85,7 +83,7 @@ router.get("/mine", async (req, res) => {
   }
 });
 
-router.get("/:id/applicants", requireRole("staff"), async (req, res) => {
+router.get("/:id/applicants", requireRole("staff", "hr"), async (req, res) => {
   try {
     const { rows } = await pool.query(
       `SELECT ja.*, u.full_name, u.email, u.resume_url, u.linkedin_url FROM job_applications ja JOIN users u ON u.id = ja.user_id WHERE ja.job_id = $1 ORDER BY ja.applied_at`,
